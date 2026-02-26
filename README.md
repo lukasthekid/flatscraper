@@ -1,141 +1,173 @@
 # FlatScraper
 
-Flat search automation for WG-Gesucht. Automatically finds new listings, generates personalized messages with AI, and sends contact requests.
+**Find WG rooms and apartments in hours, not weeks.** FlatScraper automates your search on WG-Gesucht: it discovers new listings, generates personalized messages with AI, and sends contact requests—so you can land multiple viewings while others are still refreshing the page.
 
-## Supported platforms
+---
 
-| Platform    | Status |
-|------------|--------|
-| WG-Gesucht | Ready  |
+## Why FlatScraper?
 
-## Setup
+| The old way | With FlatScraper |
+|-------------|------------------|
+| Manually refresh WG-Gesucht | Automatically scans for new listings |
+| Copy-paste generic messages | AI writes personalized Anschreiben for each ad |
+| Hope your message stands out | Tailored tone: WG-friendly or landlord-professional |
+| One viewing per week if you're lucky | **Multiple viewings in hours** |
+
+---
+
+## Demo
+
+### Setup wizard (one-time, ~2 minutes)
+
+![Setup demo](public/setup demo.gif)
+
+### FlatScraper in action
+
+![FlatScraper demo](public/flatscraper demo.gif)
+
+---
+
+## Features
+
+- **Zero cost** – Runs entirely on [Groq's free tier](https://console.groq.com). No paid APIs.
+- **Switch models** – Choose from Groq models (compound, llama, etc.) in setup or `.env`.
+- **Personalized messages** – Your profile (age, job, personality, hobbies) shapes every Anschreiben.
+- **Smart extraction** – Strips LLM meta-commentary; only the message is sent.
+- **Rate limit handling** – Automatic retries with user feedback when Groq throttles.
+- **Headless by default** – Runs in the background; use `--visible` for debugging.
+- **Dry run** – `--no-send` to preview messages without sending.
+
+---
+
+## Quick start
+
+### 1. Install
 
 ```powershell
-# Create virtual environment and install (uv recommended)
+# With uv (recommended)
 uv sync
 
 # Or with pip
-pip install -e .
+pip install flatscraper
+# or from source: pip install -e .
+```
 
-# Interaktiver Setup-Assistent (empfohlen)
-uv run setup
-# oder: uv run flatscraper setup
+### 2. Install Playwright browser
 
-# Install Playwright browser
+```powershell
 playwright install chromium
 ```
 
-### Setup-Assistent
+### 3. Run setup
 
-Der Setup-Assistent (`uv run setup` oder `flatscraper setup`) führt dich durch die Einrichtung:
+```powershell
+uv run flatscraper setup
+# or: uv run setup
+```
 
-1. **Anmeldedaten** – WG-Gesucht E-Mail/Passwort, Groq API-Schlüssel
-2. **Google Drive** – Link zu deinen Bewerbungsunterlagen
-3. **Dein Profil** – Alter, Stadt, Beruf, Persönlichkeit, Hobbys (für personalisierte Anschreiben)
-4. **KI-Optimierung** – Optional: Die KI formuliert dein Profil für bessere Nachrichten
-5. **Modell** – Groq-Modell wählen
-6. **Such-URLs** – WG-Gesucht Such-URLs hinzufügen
+The wizard guides you through:
 
-Die Konfiguration wird in `.env` und `user_profile.json` gespeichert.
+1. WG-Gesucht credentials  
+2. [Groq API key](https://console.groq.com) (free)  
+3. Google Drive link for your documents  
+4. Your profile (age, city, job, personality, hobbies)  
+5. Model selection (Groq free-tier models)  
+6. Search URLs from WG-Gesucht  
 
-### Manuelle Konfiguration
+### 4. Run
 
-Alternativ: `.env.example` nach `.env` kopieren und Werte eintragen:
+```powershell
+# Test run (no messages sent)
+uv run flatscraper --no-send
+
+# Live run
+uv run flatscraper
+```
+
+---
+
+## CLI reference
+
+| Command | Description |
+|---------|-------------|
+| `flatscraper` | Run once: find listings, generate messages, send |
+| `flatscraper --no-send` | Dry run: generate messages only, don't send |
+| `flatscraper --visible` | Show browser window (default: headless) |
+| `flatscraper --debug` | Include all listings (ignore age filter) |
+| `flatscraper --schedule` | Run repeatedly on an interval |
+| `flatscraper setup` | Run the setup wizard |
+
+---
+
+## Configuration
+
+### Environment (`.env`)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `FLATSCRAPER_EMAIL` | Yes | WG-Gesucht login email |
-| `FLATSCRAPER_PASSWORD` | Yes | WG-Gesucht login password |
-| `GROQ_API_KEY` | Yes | Groq API key from [console.groq.com](https://console.groq.com) |
+| `FLATSCRAPER_PASSWORD` | Yes | WG-Gesucht password |
+| `GROQ_API_KEY` | Yes | [Groq API key](https://console.groq.com) (free tier) |
 | `GOOGLE_DRIVE_LINK` | Yes | Google Drive folder with your documents |
-| `GROQ_MODEL` | No | LLM model (default: `llama-3.1-8b-instant`) |
+| `GROQ_MODEL` | No | Model (default: `llama-3.1-8b-instant`) |
 | `RUN_INTERVAL_MINUTES` | No | Schedule interval (default: `30`) |
-| `AUTO_RUN_ENABLED` | No | Enable auto-schedule (default: `false`) |
+| `AUTO_RUN_ENABLED` | No | Enable schedule (default: `false`) |
 
-**Never commit `.env` or `user_profile.json`** — they contain personal data. Both are in `.gitignore`.
+Copy `.env.example` to `.env` and fill in your values. **Never commit `.env` or `user_profile.json`**—they contain personal data.
 
-## Usage
+### Profile (`user_profile.json`)
 
-```powershell
-# FlatScraper starten (einmal durchlaufen)
-uv run flatscraper
+Created by the setup wizard. Contains your persona (for personalized messages) and search URLs. Edit manually or run `flatscraper setup` again.
 
-# Optionen
-flatscraper --no-send    # Nachrichten generieren, aber nicht senden
-flatscraper --visible    # Browser sichtbar (Standard: unsichtbar/headless)
-flatscraper --debug      # Alle Anzeigen (ohne Altersfilter)
-flatscraper --schedule   # In Intervallen (für später)
-flatscraper setup        # Setup-Assistent
-```
+---
 
-### Tests
+## Groq models (free tier)
+
+You can switch models in setup or via `GROQ_MODEL` in `.env`:
+
+| Model | Notes |
+|-------|-------|
+| `groq/compound` | High throughput, good for many messages |
+| `groq/compound-mini` | Fast, good for high frequency |
+| `llama-3.3-70b-versatile` | Best text quality |
+| `meta-llama/llama-4-scout-17b-16e-instruct` | Good balance |
+| `llama-3.1-8b-instant` | Default, fast |
+
+---
+
+## Tests
 
 ```powershell
 uv sync --extra dev
 uv run pytest tests/ -v
 ```
 
-### Standalone login test
-
-```powershell
-python login.py
-```
+---
 
 ## Project structure
 
 ```
 flatscraper/
-├── models.py          # Pydantic models (type-safe)
-├── config.py          # Pydantic Settings + user_profile
-├── setup_wizard.py    # Interaktiver Setup-Assistent
-├── groq_client.py    # LLM client for Anschreiben generation
 ├── run.py             # Main entry point
-├── login.py           # Standalone login test
-├── .env.example       # Template for environment variables
+├── config.py          # Settings + user profile
+├── groq_client.py     # LLM client (Groq)
+├── models.py          # Pydantic models
+├── setup_wizard.py    # Interactive setup
+├── .env.example       # Env template
 └── platforms/
-    ├── base.py       # Abstract base for platforms (Platform ABC)
-    ├── __init__.py   # Platform registry (PLATFORMS dict)
-    └── wggesucht/    # WG-Gesucht.de
-        ├── config.py
-        ├── platform.py
-        ├── search.py
-        ├── extractor.py
-        ├── login.py
-        └── messenger.py
+    └── wggesucht/     # WG-Gesucht implementation
 ```
 
-## Configuration
+---
 
-- **Setup-Assistent**: `flatscraper setup` – interaktive Einrichtung
-- **Secrets**: `.env` (E-Mail, Passwort, API-Schlüssel)
-- **Profil**: `user_profile.json` (Persona, Such-URLs) – wird vom Setup erstellt
-- **LLM-Prompts**: Persona aus Profil, Rest in `config.py`
+## Supported platforms
 
-## Pushing to GitHub
+| Platform   | Status |
+|------------|--------|
+| WG-Gesucht | ✅ Ready |
 
-1. Create a new repository on [GitHub](https://github.com/new). Do not initialize with a README.
-2. Ensure `.env` is in `.gitignore` (it is). Never commit secrets.
-3. Add the remote and push:
+---
 
-```powershell
-git remote add origin https://github.com/YOUR_USERNAME/flatscraper.git
-git branch -M main
-git push -u origin main
-```
+## License
 
-4. After pushing, add your `.env` file locally (it stays on your machine only).
-
-## Adding new platforms
-
-To add support for another flat search website:
-
-1. Create `platforms/<name>/` with config, login, search, extractor, messenger as needed.
-2. Implement the `Platform` ABC from `platforms/base.py` in `platforms/<name>/platform.py`:
-   - `name` (property)
-   - `login(page)`
-   - `run_search(page, include_all)` → `list[Listing]`
-   - `extract_details(page, url)` → `ListingDetails | None`
-   - `send_message(page, listing_url, message_text)` → `bool`
-3. Register in `platforms/__init__.py`: `PLATFORMS["<name>"] = NewPlatform()`
-
-The main run loop in `run.py` is generic—valid platforms are read from the registry, so no further changes are needed.
+MIT
