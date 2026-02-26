@@ -68,6 +68,13 @@ flatscraper --schedule   # In Intervallen (für später)
 flatscraper setup        # Setup-Assistent
 ```
 
+### Tests
+
+```powershell
+uv sync --extra dev
+uv run pytest tests/ -v
+```
+
 ### Standalone login test
 
 ```powershell

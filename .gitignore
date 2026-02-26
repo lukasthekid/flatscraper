@@ -11,3 +11,4 @@ dist/
 build/
 debug_html/
 *_login_debug.png
+.pytest_cache/
