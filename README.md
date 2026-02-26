@@ -19,11 +19,11 @@
 
 ### Setup wizard (one-time, ~2 minutes)
 
-![Setup demo](public/setup demo.gif)
+![Setup demo](public/setup-demo.gif)
 
 ### FlatScraper in action
 
-![FlatScraper demo](public/flatscraper demo.gif)
+![FlatScraper demo](public/flatscraper-demo.gif)
 
 ---
 
