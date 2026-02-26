@@ -44,24 +44,21 @@
 ### 1. Install
 
 ```powershell
-# With uv (recommended)
-uv sync
-
-# Or with pip
-pip install flatscraper
-# or from source: pip install -e .
+#playwright for the browser automation
+pip install flatscraper playwright
 ```
 
 ### 2. Install Playwright browser
 
 ```powershell
 playwright install chromium
+#or: uv sync
 ```
 
 ### 3. Run setup
 
 ```powershell
-uv run flatscraper setup
+flatscraper setup
 # or: uv run setup
 ```
 
@@ -78,10 +75,12 @@ The wizard guides you through:
 
 ```powershell
 # Test run (no messages sent)
-uv run flatscraper --no-send
+flatscraper --no-send
+#or: uv run flatscraper --no-send
 
 # Live run
-uv run flatscraper
+flatscraper
+#or: uv run flatscraper
 ```
 
 ---
