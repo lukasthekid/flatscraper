@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 FlatScraper - flat search automation (WG-Gesucht).
-Run: python run.py [--platform wggesucht] [--once] [--schedule] [--no-send] [--debug]
+CLI: flatscraper | flatscraper --no-send | flatscraper --visible | flatscraper setup
 """
 
 import sys
@@ -14,139 +14,189 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parent))
 
 from playwright.sync_api import sync_playwright
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.rule import Rule
+from rich.table import Table
+
 from config import (
-    GOOGLE_DRIVE_LINK,
-    RUN_INTERVAL_MINUTES,
     AUTO_RUN_ENABLED,
+    GOOGLE_DRIVE_LINK,
     GROQ_MODEL,
+    RUN_INTERVAL_MINUTES,
 )
 from groq_client import generate_anschreiben
+from models import ListingData
 from platforms import PLATFORMS
 
-
-def _parse_args():
-    argv = sys.argv[1:]
-    platform = "wggesucht"
-    for a in argv:
-        if not a.startswith("-") and a.lower() in PLATFORMS:
-            platform = a.lower()
-            break
-    for i, a in enumerate(argv):
-        if a == "--platform" and i + 1 < len(argv):
-            platform = argv[i + 1].lower()
-            break
-    return platform
+console = Console()
 
 
-def run_platform(platform, page):
+def run_platform(platform, page) -> None:
     """Run crawler for the given platform."""
     debug = "--debug" in sys.argv or "-d" in sys.argv
     no_send = "--no-send" in sys.argv
 
-    print(f"\n=== Login ({platform.name}) ===")
+    # Login
+    console.print()
+    console.print(Rule("[bold]Anmeldung[/bold]", style="blue"))
     platform.login(page)
 
-    listings = platform.run_search(page, include_all=debug)
-    if debug:
-        print(f"Found {len(listings)} organic listings (all, DEBUG mode)")
-    else:
-        print(f"Found {len(listings)} organic listings < 1 hour old")
+    # Search
+    console.print()
+    console.print(Rule("[bold]Suche[/bold]", style="blue"))
+    with console.status("[bold green]Durchsuche WG-Gesucht...[/bold green]", spinner="dots"):
+        listings = platform.run_search(page, include_all=debug)
 
+    if not listings:
+        console.print("[yellow]Keine neuen Anzeigen gefunden.[/yellow]")
+        return
+
+    age_info = "alle Anzeigen (Debug)" if debug else "unter 1 Stunde alt"
+    console.print(f"[green]Gefunden: {len(listings)} Anzeigen[/green] ({age_info})")
+    console.print()
+
+    # Process each listing
     for i, listing in enumerate(listings, 1):
-        print(f"\n--- Listing {i}: {listing.url} ---")
-        print(f"   ID: {listing.ad_id} | {listing.price} | {listing.size} | {listing.raw_age_text}")
+        console.print(Panel.fit(
+            f"[bold]{listing.title[:70]}{'...' if len(listing.title) > 70 else ''}[/bold]\n"
+            f"ID: {listing.ad_id}  |  {listing.price}  |  {listing.size}  |  {listing.raw_age_text}\n"
+            f"[dim]{listing.url}[/dim]",
+            title=f"Anzeige {i}/{len(listings)}",
+            border_style="cyan",
+        ))
 
-        print("   Opening listing page...")
-        details = platform.extract_details(page, listing.url)
+        with console.status("[dim]Öffne Anzeige...[/dim]", spinner="dots"):
+            details = platform.extract_details(page, listing.url)
+
         if not details:
             try:
                 if page.get_by_text("Unterhaltung ansehen").first.is_visible():
-                    print("   [SKIP] Already contacted (Unterhaltung ansehen)")
+                    console.print("  [yellow]→ Bereits kontaktiert, übersprungen[/yellow]")
                 else:
-                    print("   [SKIP] Could not extract listing details")
+                    console.print("  [yellow]→ Details konnten nicht extrahiert werden[/yellow]")
             except Exception:
-                print("   [SKIP] Could not extract listing details")
+                console.print("  [yellow]→ Details konnten nicht extrahiert werden[/yellow]")
+            console.print()
             continue
 
-        print(f"   Title: {details.title[:60]}...")
-        print(f"   Address: {details.address}")
+        # Listing info
+        table = Table(show_header=False)
+        table.add_column("", style="dim", width=12)
+        table.add_column("")
+        table.add_row("Titel", details.title[:80] + ("..." if len(details.title) > 80 else ""))
+        table.add_row("Adresse", details.address)
+        table.add_row("Typ", "WG-Zimmer" if details.ad_type == "wg" else "Wohnung")
+        console.print(table)
 
-        print(f"   Generating Anschreiben with {GROQ_MODEL}...")
-        anschreiben = None
-        try:
-            listing_data = {
-                "title": details.title,
-                "address": details.address,
-                "publisher_name": details.publisher_name or "",
-                "full_description": details.full_description,
-                "google_drive": GOOGLE_DRIVE_LINK,
-                "ad_type": details.ad_type,
-            }
-            anschreiben = generate_anschreiben(listing_data)
-            print("\n   === GENERATED ANSCHREIBEN (vollständig) ===\n")
-            print(anschreiben)
-            print("\n   === ENDE ANSCHREIBEN ===")
-            print(f"   Länge: {len(anschreiben)} Zeichen, {len(anschreiben.split())} Wörter\n")
-        except Exception as e:
-            print(f"   [ERROR] LLM: {e}")
+        # Generate Anschreiben
+        def on_rate_limit(wait_sec: float, attempt: int) -> None:
+            console.print(f"  [yellow]Rate limit – warte {wait_sec:.0f}s (Versuch {attempt + 1}/4)...[/yellow]")
 
-        if anschreiben and not no_send:
-            print("   Sending message...")
-            platform.send_message(page, listing.url, anschreiben)
-        elif anschreiben and no_send:
-            print("   [SKIP] Message not sent (--no-send)")
+        with console.status(f"[dim]Generiere Anschreiben mit {GROQ_MODEL}...[/dim]", spinner="dots"):
+            anschreiben = None
+            try:
+                data = ListingData(
+                    title=details.title,
+                    address=details.address,
+                    publisher_name=details.publisher_name or "",
+                    full_description=details.full_description,
+                    google_drive=GOOGLE_DRIVE_LINK,
+                    ad_type=details.ad_type,
+                )
+                anschreiben = generate_anschreiben(data, on_retry=on_rate_limit)
+            except Exception as e:
+                console.print(f"  [red]Fehler bei KI-Generierung: {e}[/red]")
+
+        if anschreiben:
+            console.print()
+            console.print(Panel(
+                anschreiben,
+                title="[bold]Generiertes Anschreiben[/bold]",
+                subtitle=f"{len(anschreiben)} Zeichen, {len(anschreiben.split())} Wörter",
+                border_style="green",
+            ))
+
+            if no_send:
+                console.print("  [yellow]→ Nicht gesendet (--no-send)[/yellow]")
+            else:
+                with console.status("[dim]Sende Nachricht...[/dim]", spinner="dots"):
+                    success = platform.send_message(page, listing.url, anschreiben)
+                if success:
+                    console.print("  [green]✓ Nachricht gesendet[/green]")
+                else:
+                    console.print("  [red]✗ Senden fehlgeschlagen[/red]")
+
+        console.print()
 
 
-def main():
-    platform_name = _parse_args()
-    use_schedule = (
-        "--schedule" in sys.argv
-        or (AUTO_RUN_ENABLED and "--once" not in sys.argv)
-    )
-
-    if platform_name not in PLATFORMS:
-        valid = ", ".join(PLATFORMS.keys())
-        print(f"Unknown platform: {platform_name}. Use --platform {valid}")
+def main() -> None:
+    # Setup-Assistent
+    if len(sys.argv) >= 2 and sys.argv[1].lower() == "setup":
+        from setup_wizard import run_setup
+        run_setup()
         return
 
-    platform = PLATFORMS[platform_name]
+    # Banner
+    console.print()
+    console.print(Panel.fit(
+        "[bold]FlatScraper[/bold]\n"
+        "WG-Gesucht Automatisierung – sucht Anzeigen, generiert Anschreiben, sendet Nachrichten.",
+        border_style="green",
+    ))
+
+    platform = PLATFORMS["wggesucht"]
+    use_schedule = "--schedule" in sys.argv or AUTO_RUN_ENABLED
+
+    if use_schedule:
+        console.print(f"[dim]Modus: Alle {RUN_INTERVAL_MINUTES} Min.[/dim]")
+    else:
+        console.print("[dim]Modus: Einmal durchlaufen[/dim]")
+
+    if "--no-send" in sys.argv:
+        console.print("[yellow]Hinweis: Nachrichten werden nicht gesendet (--no-send)[/yellow]")
+
+    show_browser = "--visible" in sys.argv or "-v" in sys.argv
+    if show_browser:
+        console.print("[dim]Browser sichtbar (--visible)[/dim]")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=not show_browser)
         context = browser.new_context(
             viewport={"width": 1280, "height": 900},
             locale="de-DE",
         )
         page = context.new_page()
 
-        if use_schedule:
-            print(f"[Mode] Scheduled: every {RUN_INTERVAL_MINUTES} min (use --once for single run)")
-        else:
-            print("[Mode] Single run (use --schedule for repeated runs)")
-
         cycle = 0
         while True:
             cycle += 1
             if use_schedule and cycle > 1:
-                print(f"\n=== [Cycle {cycle}] Next run in {RUN_INTERVAL_MINUTES} minutes ===")
+                console.print()
+                console.print(f"[dim]Nächster Lauf in {RUN_INTERVAL_MINUTES} Minuten...[/dim]")
                 time.sleep(RUN_INTERVAL_MINUTES * 60)
 
-            print(f"\n=== Search (cycle {cycle}) ===")
             run_platform(platform, page)
 
             if not use_schedule:
-                print("\n=== Done ===")
                 break
-
             if "--quick" in sys.argv:
                 break
+
+        # Abschluss
+        console.print()
+        console.print(Rule("[bold green]Fertig[/bold green]", style="green"))
+        if not use_schedule:
+            console.print("FlatScraper wurde einmal durchlaufen.")
 
         if "--quick" in sys.argv:
             time.sleep(5)
             browser.close()
         else:
             try:
-                input("Press Enter to close browser...")
+                console.print()
+                input("Enter drücken zum Beenden...")
             except EOFError:
                 pass
             browser.close()

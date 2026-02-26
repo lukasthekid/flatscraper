@@ -17,16 +17,30 @@ uv sync
 # Or with pip
 pip install -e .
 
-# Copy environment template and fill in your values
-copy .env.example .env
+# Interaktiver Setup-Assistent (empfohlen)
+uv run setup
+# oder: uv run flatscraper setup
 
 # Install Playwright browser
 playwright install chromium
 ```
 
-### Environment variables
+### Setup-Assistent
 
-Copy `.env.example` to `.env` and set your values:
+Der Setup-Assistent (`uv run setup` oder `flatscraper setup`) führt dich durch die Einrichtung:
+
+1. **Anmeldedaten** – WG-Gesucht E-Mail/Passwort, Groq API-Schlüssel
+2. **Google Drive** – Link zu deinen Bewerbungsunterlagen
+3. **Dein Profil** – Alter, Stadt, Beruf, Persönlichkeit, Hobbys (für personalisierte Anschreiben)
+4. **KI-Optimierung** – Optional: Die KI formuliert dein Profil für bessere Nachrichten
+5. **Modell** – Groq-Modell wählen
+6. **Such-URLs** – WG-Gesucht Such-URLs hinzufügen
+
+Die Konfiguration wird in `.env` und `user_profile.json` gespeichert.
+
+### Manuelle Konfiguration
+
+Alternativ: `.env.example` nach `.env` kopieren und Werte eintragen:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -38,24 +52,20 @@ Copy `.env.example` to `.env` and set your values:
 | `RUN_INTERVAL_MINUTES` | No | Schedule interval (default: `30`) |
 | `AUTO_RUN_ENABLED` | No | Enable auto-schedule (default: `false`) |
 
-**Never commit `.env`** — it contains secrets. `.env` is in `.gitignore`.
+**Never commit `.env` or `user_profile.json`** — they contain personal data. Both are in `.gitignore`.
 
 ## Usage
 
 ```powershell
-# Run WG-Gesucht (the main command)
-uv run run wggesucht
-# or: run wggesucht
+# FlatScraper starten (einmal durchlaufen)
+uv run flatscraper
 
-# Or with Python
-python run.py wggesucht
-python run.py --platform wggesucht
-
-# Options
-run wggesucht --once                 # Single run (no schedule)
-run wggesucht --schedule             # Run every N minutes
-run wggesucht --no-send              # Generate messages but don't send
-run wggesucht --debug                # Include all listings (ignore age filter)
+# Optionen
+flatscraper --no-send    # Nachrichten generieren, aber nicht senden
+flatscraper --visible    # Browser sichtbar (Standard: unsichtbar/headless)
+flatscraper --debug      # Alle Anzeigen (ohne Altersfilter)
+flatscraper --schedule   # In Intervallen (für später)
+flatscraper setup        # Setup-Assistent
 ```
 
 ### Standalone login test
@@ -68,11 +78,13 @@ python login.py
 
 ```
 flatscraper/
-├── config.py          # Loads config from environment
+├── models.py          # Pydantic models (type-safe)
+├── config.py          # Pydantic Settings + user_profile
+├── setup_wizard.py    # Interaktiver Setup-Assistent
 ├── groq_client.py    # LLM client for Anschreiben generation
-├── run.py            # Main entry point
-├── login.py          # Standalone login test
-├── .env.example      # Template for environment variables
+├── run.py             # Main entry point
+├── login.py           # Standalone login test
+├── .env.example       # Template for environment variables
 └── platforms/
     ├── base.py       # Abstract base for platforms (Platform ABC)
     ├── __init__.py   # Platform registry (PLATFORMS dict)
@@ -87,9 +99,10 @@ flatscraper/
 
 ## Configuration
 
-Secrets and API keys are loaded from environment variables (see `.env.example`).  
-LLM prompts can be customized in `config.py`.  
-Platform-specific settings: `platforms/wggesucht/config.py`.
+- **Setup-Assistent**: `flatscraper setup` – interaktive Einrichtung
+- **Secrets**: `.env` (E-Mail, Passwort, API-Schlüssel)
+- **Profil**: `user_profile.json` (Persona, Such-URLs) – wird vom Setup erstellt
+- **LLM-Prompts**: Persona aus Profil, Rest in `config.py`
 
 ## Pushing to GitHub
 

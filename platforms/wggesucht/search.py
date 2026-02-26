@@ -6,23 +6,12 @@ Scans organic listings (excludes partner section), filters by age (< 1 hour).
 
 import re
 import time
-from dataclasses import dataclass
 
 from playwright.sync_api import Page
 
-from platforms.wggesucht.config import WG_SEARCH_URLS, MAX_LISTING_AGE_HOURS, EXCLUDED_PROVIDERS
-
-
-@dataclass
-class Listing:
-    """Parsed listing from search results."""
-    ad_id: str
-    title: str
-    url: str
-    price: str
-    size: str
-    age_minutes: int | None  # None if cannot parse
-    raw_age_text: str
+from config import get_search_urls
+from models import Listing
+from platforms.wggesucht.config import MAX_LISTING_AGE_HOURS, EXCLUDED_PROVIDERS, WG_SEARCH_URLS as DEFAULT_WG_SEARCH_URLS
 
 
 def _parse_online_age(text: str) -> tuple[int | None, str]:
@@ -60,7 +49,7 @@ def _extract_ad_id_from_url(url: str) -> str:
 
 
 def _get_search_urls() -> list[str]:
-    urls = WG_SEARCH_URLS
+    urls = get_search_urls() or DEFAULT_WG_SEARCH_URLS
     if isinstance(urls, str):
         return [urls]
     return list(urls)

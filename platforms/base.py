@@ -1,36 +1,14 @@
 """Abstract base for flat search platforms."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 from playwright.sync_api import Page
 
-
-@dataclass
-class Listing:
-    """Parsed listing from search results (platform-agnostic)."""
-    ad_id: str
-    title: str
-    url: str
-    price: str
-    size: str
-    age_minutes: int | None
-    raw_age_text: str
+from models import Listing, ListingDetails
 
 
-@dataclass
-class ListingDetails:
-    """Extracted details from a listing detail page (platform-agnostic)."""
-    title: str
-    address: str
-    full_description: str
-    ad_id: str
-    rent: str
-    size: str
-    available_from: str
-    publisher_name: str
-    wg_details: str = ""  # Platform-specific extra
-    ad_type: str = "wg"  # "wg" = WG-Zimmer, "wohnung" = Wohnung/1-Zimmer-Wohnung
+# Re-export for backward compatibility
+__all__ = ["Listing", "ListingDetails", "Platform"]
 
 
 class Platform(ABC):

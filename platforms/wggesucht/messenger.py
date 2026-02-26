@@ -58,9 +58,6 @@ def send_anschreiben(page: Page, listing_url: str, message_text: str) -> bool:
         ).first
         send_btn.click(timeout=5000)
         time.sleep(2)
-        print("   [OK] Message sent!")
         return True
-    except Exception as e:
-        err_msg = str(e).encode("ascii", errors="replace").decode()
-        print(f"   [ERROR] Failed to send message: {err_msg}")
+    except Exception:
         return False

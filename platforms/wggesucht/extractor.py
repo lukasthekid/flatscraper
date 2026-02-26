@@ -3,14 +3,12 @@
 Extract listing details from a WG-Gesucht detail page for Anschreiben generation.
 """
 
-from dataclasses import dataclass
-
 from playwright.sync_api import Page
 
-from platforms.base import ListingDetails as BaseListingDetails
+from models import ListingDetails
 
 
-def extract_listing_details(page: Page, url: str) -> BaseListingDetails | None:
+def extract_listing_details(page: Page, url: str) -> ListingDetails | None:
     """
     Navigate to listing URL and extract all data needed for WG Anschreiben.
     Returns None if extraction fails.
@@ -124,7 +122,7 @@ def extract_listing_details(page: Page, url: str) -> BaseListingDetails | None:
         """)
         if not data or not data.get("title"):
             return None
-        return BaseListingDetails(
+        return ListingDetails(
             title=data.get("title", ""),
             address=data.get("address", ""),
             full_description=data.get("full_description", ""),
