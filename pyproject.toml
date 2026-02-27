@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flatscraper"
-version = "0.1.0"
+version = "0.1.1"
 description = "Multi-platform flat search automation"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +22,10 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/lukasthekid/flatscraper"
+Repository = "https://github.com/lukasthekid/flatscraper"
 
 [tool.setuptools.packages.find]
 where = ["."]
