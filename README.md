@@ -1,4 +1,4 @@
-# FlatScraper
+# 🏠 FlatScraper [![PyPI version](https://badge.fury.io/py/flatscraper.svg)](https://pypi.org/project/flatscraper/)
 
 **Find WG rooms and apartments in hours, not weeks.** FlatScraper automates your search on [WG-Gesucht](https://www.wg-gesucht.de/): it discovers new listings, generates personalized messages with AI, and sends contact requests—so you can land multiple viewings while others are still refreshing the page.
 
